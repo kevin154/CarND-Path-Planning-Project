@@ -19,12 +19,10 @@ int arg_min(vector<T, A> const& vec) {
 // Initializes Vehicle
 Car::Car(){}
 
-Car::Car(int lane, double position, double velocity, double target_position) 
+Car::Car(int lane, double velocity) 
 {
     this->lane = lane;
-    this->position = position;
     this->velocity = velocity;
-    this->target_position = target_position;
     
     car_front_speed = 0.0;
    
