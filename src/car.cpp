@@ -41,7 +41,7 @@ Car::~Car() {}
 double Car::get_d()
 {
     // Return d value halfway along lane width
-    return (0.5 + this->lane) * lane_width;
+    return (0.5 + lane) * lane_width;
 }
 
 
@@ -53,19 +53,19 @@ void Car::update_predictions(const nlohmann::basic_json<>::value_type& data)
      auto prev_path_size = data["previous_path_x"].size();
   
      // Set indicators to default
-     this->car_in_front = false;
-     this->car_to_left = false;
-     this->car_to_right = false;
+     car_in_front = false;
+     car_to_left = false;
+     car_to_right = false;
   
      for (auto vehicle_data : sensor_fusion)
      {
          double vehicle_s = vehicle_data[5];       
          
          // Focus on vehicles currently nearby
-         if(fabs(vehicle_s - current_s) < 2 * this->collision_tol)
+         if(fabs(vehicle_s - current_s) < 2 * collision_tol)
          {
              double vehicle_d = vehicle_data[6]; 
-             int vehicle_lane = static_cast<int>(vehicle_d / this->lane_width);
+             int vehicle_lane = static_cast<int>(vehicle_d / lane_width);
              
              double vehicle_vx = vehicle_data[3];
              double vehicle_vy = vehicle_data[4];
@@ -75,22 +75,22 @@ void Car::update_predictions(const nlohmann::basic_json<>::value_type& data)
              vehicle_s += vehicle_speed * 0.02 * prev_path_size;
            
              // Check car in front
-             if((vehicle_lane == this->lane) && (vehicle_s > current_s) && ((vehicle_s - current_s) < this->collision_tol))
+             if((vehicle_lane == lane) && (vehicle_s > current_s) && ((vehicle_s - current_s) < collision_tol))
              { 
-                 this->car_in_front = true;
-                 this->car_front_speed = vehicle_speed;
+                 car_in_front = true;
+                 car_front_speed = vehicle_speed;
              }
              
              // Check car to left
-             if((vehicle_lane == this->lane - 1) && (fabs(current_s < vehicle_s) < this->collision_tol))
+             if((vehicle_lane == lane - 1) && (fabs(current_s < vehicle_s) < collision_tol))
              {
-                 this->car_to_left = true;
+                 car_to_left = true;
              }
              
              // Check car to right
-             if((vehicle_lane == this->lane + 1) && (fabs(current_s < vehicle_s) < this->collision_tol))
+             if((vehicle_lane == lane + 1) && (fabs(current_s < vehicle_s) < collision_tol))
              {
-                 this->car_to_right = true;
+                 car_to_right = true;
              }
          }
      }
@@ -103,20 +103,20 @@ vector<pair<int, double>> Car::generate_successor_trajectories()
   vector<pair<int, double>> successors;
   
   // Keeping same lane and same / higher speed if nothing ahead
-  if(!this->car_in_front)
-      successors.push_back(std::make_pair(this->lane, fmin(this->velocity + 0.224, this->max_velocity)));
+  if(!car_in_front)
+      successors.push_back(std::make_pair(lane, fmin(velocity + 0.224, max_velocity)));
   
   // If car in front can stay in current lane and slow down to speed of car in front with 20% buffer
-  if(this->car_in_front)
-      successors.push_back(std::make_pair(this->lane, fmax(this->velocity - 0.224, 0.8 * this->car_front_speed)));
+  if(car_in_front)
+      successors.push_back(std::make_pair(lane, fmax(velocity - 0.224, 0.8 * car_front_speed)));
       
   // Change lane left, avoid changing lanes at very slow speed or top speed
-  if((this->velocity > 0.2 * this->max_velocity) && !this->car_to_left && (this->lane != 0))
-      successors.push_back(std::make_pair(this->lane - 1, fmin(this->velocity, this->max_velocity - 0.056)));
+  if((velocity > 0.2 * max_velocity) && !car_to_left && (lane != 0))
+      successors.push_back(std::make_pair(lane - 1, fmin(velocity, max_velocity - 0.056)));
        
   // Change lane right, avoid changing lanes at very slow speed or top speed
-  if((this->velocity > 0.2 * this->max_velocity) && !this->car_to_right && (this->lane != 2))
-      successors.push_back(std::make_pair(this->lane + 1, fmin(this->velocity, this->max_velocity - 0.056)));
+  if((velocity > 0.2 * max_velocity) && !car_to_right && (lane != 2))
+      successors.push_back(std::make_pair(lane + 1, fmin(velocity, max_velocity - 0.056)));
   
   return successors;
 }
@@ -133,9 +133,9 @@ std::pair<int, double> Car::get_lowest_cost_trajectory(vector<pair<int, double>>
         int lane = trajectory.first;
         double vel = trajectory.second;
         cost = 0.0;
-        cost += this->acc_cost_weight * acceleration_cost(vel);
-        cost += this->speed_cost_weight * speed_cost(vel);
-        cost += this->lane_cost_weight * lane_cost(lane);
+        cost += acc_cost_weight * acceleration_cost(vel);
+        cost += speed_cost_weight * speed_cost(vel);
+        cost += lane_cost_weight * lane_cost(lane);
         cost_vector.push_back(cost);
     }        
     return trajectories[arg_min(cost_vector)];    
@@ -145,15 +145,15 @@ std::pair<int, double> Car::get_lowest_cost_trajectory(vector<pair<int, double>>
 // Cost against exceeding max acceleration
 double Car::acceleration_cost(double new_velocity)
 {
-    double acceleration = (new_velocity - this->velocity) / 0.02;
-    return std::abs(acceleration) > this->max_acceleration ? 1.0 : std::abs(acceleration) / this->max_acceleration;
+    double acceleration = (new_velocity - velocity) / 0.02;
+    return std::abs(acceleration) > max_acceleration ? 1.0 : std::abs(acceleration) / max_acceleration;
 }
 
 
 // Cost against exceeding speed limit or driving too slowly
 double Car::speed_cost(double new_velocity)
 {
-    return new_velocity > this->max_velocity ? 1.0 : (this->max_velocity - new_velocity) / this->max_velocity;
+    return new_velocity > max_velocity ? 1.0 : (max_velocity - new_velocity) / max_velocity;
 }
 
 
@@ -217,7 +217,7 @@ vector<vector<double>> Car::create_trajectory(const nlohmann::basic_json<>::valu
         ptsy.push_back(ref_y);
     }
     
-    int segment_length = static_cast<int>(this->collision_tol);
+    int segment_length = static_cast<int>(collision_tol);
       
     for (int i = segment_length; i <= 3 * segment_length; i += segment_length)
     {   
@@ -257,7 +257,7 @@ vector<vector<double>> Car::create_trajectory(const nlohmann::basic_json<>::valu
     // Add new points to path planner
     for (int i = 1; i <= 50 - prev_path_size; i++)
     {
-        double N = target_dist / (0.02 * this->velocity / 2.24);
+        double N = target_dist / (0.02 * velocity / 2.24);
         double x_point = x_add_on + target_x / N;
         double y_point = s(x_point);
             
